@@ -1,0 +1,151 @@
+#+TITLE: Clojure Python Babel Example
+#+DATE: <2015-10-19 Mon>
+#+AUTHOR: Julien Chastang
+#+EMAIL: chastang@ucar.edu
+#+LANGUAGE: en
+#+SELECT_TAGS: export
+#+EXCLUDE_TAGS: noexport
+#+CREATOR: Emacs 24.5.1 (Org mode 8.3.2)
+#+OPTIONS: ':nil *:t -:t ::t <:t H:3 \n:nil ^:t arch:headline author:t c:nil
+#+OPTIONS: creator:nil d:(not "LOGBOOK") date:t e:t email:nil f:t inline:t
+#+OPTIONS: num:nil p:nil pri:nil prop:nil stat:t tags:t tasks:t tex:t timestamp:t
+#+OPTIONS: title:t toc:nil todo:t |:t
+
+* Clojure Python Babel Example
+
+This multi programming language emacs org-babel 'notebook' demonstrates how you
+can work with Clojure and Python in one environment. Note the examples below are
+somewhat contrived for demonstration purposes. Realistically one would not
+define a Lorenz attractor in Clojure and render it in Python, for example. You
+could achieve that plot in either general purpose language. This notebook is
+merely to show that is possible, and for notebooks that we will see in the
+future, it will be necessary to interoperate between Python and Clojure.
+
+Before interacting with this org file, you may wish to not have babel require
+[[http://orgmode.org/manual/Code-evaluation-security.html][confirmation for running every code block]].
+
+#+BEGIN_SRC emacs-lisp :results silent :exports none
+  (setq org-confirm-babel-evaluate nil)
+#+END_SRC
+
+Setting up namespace, imports, load libraries, etc. At this point you will want
+to =cider-jack-in= if running interactively within an emacs babel buffer.
+
+#+BEGIN_SRC clojure :exports code :results silent
+  (ns meetup.clojure-python
+    (:import meetup.NPY)
+    (:require [clojure.java.io :as io]))
+#+END_SRC
+
+Let's start off by defining simple 2-D vector dataset in Clojure.
+
+#+NAME: clojure-data
+#+BEGIN_SRC clojure :exports both :results silent
+  [[1 2 3][4 5 6][7 8 9]]
+#+END_SRC
+
+Let's consume that Clojure data with a Python numpy array via org-babel.
+
+#+BEGIN_SRC ipython :session :var data=clojure-data :exports both
+  import numpy as np
+  np.array(data)
+#+END_SRC
+
+#+RESULTS:
+: array([[1, 2, 3],
+:        [4, 5, 6],
+:        [7, 8, 9]])
+
+
+Now for something a little fancier. We can define a 'meshgrid' in Clojure.
+
+#+NAME: meshgrid-data
+#+BEGIN_SRC clojure :results silent :exports code
+  (let [meshgrid (fn [x,y] 
+                   [(vec (repeat (count y) x))
+                    (vec (map #(vec (repeat (count x) %)) y))])
+        a (vec (range -1.2 1.2 0.1))]
+    (meshgrid a a))
+#+END_SRC
+
+And render it in Python. Note that we are passing the data via emacs and
+the org-babel arguments.
+
+#+BEGIN_SRC ipython :session :var data=meshgrid-data :file image/contour.png :exports both
+  %matplotlib inline
+
+  import numpy as np
+  import matplotlib.pyplot as plt
+
+  X, Y = data
+
+  Z = np.cos(X)*np.cos(Y)
+  Z = Z*Z
+  CS = plt.contour(X, Y, Z)
+  plt.clabel(CS, inline=1, fontsize=10)
+  plt.show()
+#+END_SRC
+
+#+RESULTS:
+[[file:image/contour.png]]
+
+
+This meshgrid example is good for small and medium-sized data but, if we want to
+work with large data between Clojure and Python, we may have to pass have to
+pass data via the file system.
+
+In the following block of code we will calculate the points of the [[https://en.wikipedia.org/wiki/Lorenz_system][Lorenz
+attractor]], and write the data to a [[http://docs.scipy.org/doc/numpy-dev/neps/npy-format.html][numpy formatted]] file =butterfly.dat=.
+
+=meetup.NPY/write= function comes from the =meetup.NPY= Java class to write
+numpy formatted arrays to disk.
+
+#+BEGIN_SRC clojure :results silent :exports code
+  (defn lorenz [x y z]
+    (let [s 10.0
+          r 28.0
+          b 2.667]
+      [(* s (- y x))
+       (- (* r x) y (* x z))
+       (- (* x y) (* b z))]))
+
+  (defn butterfly [x y z]
+    (let [dt 0.01
+          [x-dot y-dot z-dot] (lorenz x y z)]
+      [(+ x (* x-dot dt))
+       (+ y (* y-dot dt))
+       (+ z (* z-dot dt))]))
+
+  (def butter
+    (take 11000 (iterate (fn [[x y z]] (butterfly x y z)) [0.0 1.0 1.05])))
+
+  (meetup.NPY/write
+   (into-array (map float-array butter)) (io/file "butterfly.dat"))
+#+END_SRC
+
+Finally, from Python, read the data from disk, and plot the Lorenz attractor.
+
+#+BEGIN_SRC ipython :session :file image/butterfly.png :exports both
+  %matplotlib inline
+
+  import numpy as np
+  import matplotlib.pyplot as plt
+  from mpl_toolkits.mplot3d import Axes3D
+
+  a = np.load('/home/python/work/emacs-2016-03-01/meetup/butterfly.dat')
+
+  fig = plt.figure()
+  ax = fig.gca(projection='3d')
+
+  ax.plot(a[:, 0], a[:, 1], a[:, 2])
+  ax.set_xlabel("X Axis")
+  ax.set_ylabel("Y Axis")
+  ax.set_zlabel("Z Axis")
+  ax.set_title("Lorenz Attractor")
+
+  plt.show()
+#+END_SRC
+
+#+RESULTS:
+[[file:image/butterfly.png]]
+

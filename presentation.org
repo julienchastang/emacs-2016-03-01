@@ -1,0 +1,85 @@
+#+TITLE: emacs and docker
+#+Author: Julien Chastang
+#+EMAIL: julien.c.chastang@gmail.com
+#+STARTUP: inlineimages indent
+
+
+* What is Docker?
+
+- Borrows from the notion of *shipping containers*
+- Docker is an *open source* platform for uniformly building, deploying & running software
+- *Linux only*, so most applicable (but not limited) to server-side
+- Barrier to entry is low
+
+* Docker Features
+
+- Lightweight OS *isolation* (or illusion of...)
+- *Portability* (package & deploy your app on Docker locally or on cloud)
+- Codified, version controlled, layered, reproducible environments
+- Faster software life cycle
+- [[http://www.infoworld.com/article/2607128/application-development/4-ways-docker-fundamentally-changes-application-development.html][Legos for cloud computing]]
+
+* Dockerfile
+
+- Makefile for Docker containers
+- A Dockerfile is a formal description of the container
+- A Dockerfile has its own simple, mini-DSL for describing a container
+- A Dockerfile is a series of instructions written in DSL executed sequentially
+
+* Dockerfile DSL
+
+- =FROM <image>:<tag>=  Set the base image
+- =RUN= Execute commands for building container
+- =ADD <src>... <dest>= Add files from a URI
+- =COPY= Similar to =ADD= (AFAIK)
+- =EXPOSE <port>= The container will listen on specific port
+- =VOLUME= Mounting a volume from the host OS
+- =ENV <key> <value>= Set environment variables
+- =WORKDIR= Set the working directory
+- =CMD= Default execution process of the container. (There can only be one.)
+- [[https://docs.docker.com/reference/builder/][Several more instructions]]
+
+* Why Run Emacs in Docker?
+
+- Docker usually for server-side, but can be useful for client
+- Emacs external dependencies can take long time to properly configure
+- External package managers (e.g., conda) should be isolated from base OS to avoid conflicts
+- Freeze dried environment you know will work, instead of something failing in the dependency chain
+- In sum, managing complexity and achieving reproduciblity
+
+* .emacs and External Emacs Dependencies 
+
+- Complex [[file:~/.emacs.d/git/dotemacs/settings.org][dotemacs]] with many assumptions about envirornment
+- Python, conda, Python package manager
+- LaTex (and emacs integration with Latex)
+- spelling programs (e.g., aspell)
+- ditaa, diagrammming tool
+- Java, leiningen, clojure
+
+* Emacs Dockerfile
+
+- [[file:Dockerfile][Dockerfile]] 
+
+* Building the Emacs Container
+
+# I have not had luck with eshell so run from zsh or some such
+#+BEGIN_SRC sh :eval no
+# This can take a while...
+docker-machine create --driver virtualbox emacs-meetup
+eval "$(docker-machine env emacs-meetup)"
+docker build -t emacs:latest .
+#+END_SRC
+
+  Running the Emacs Container
+
+- ~socat~, a multipurpose network relay utility you'll need for the remote X Display
+- [[file:emacs.sh][emacs.sh]], a shell script that takes the pain away from calling ~docker~ with correct arguments
+
+#+BEGIN_SRC sh 
+socat TCP-LISTEN:6000,reuseaddr,fork UNIX-CLIENT:\"$DISPLAY\"
+#+END_SRC
+
+#+BEGIN_SRC sh :eval no 
+sh emacs.sh 
+sh emacs.sh -ip <IP Address from LAN>
+#+END_SRC
