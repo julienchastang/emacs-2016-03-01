@@ -70,7 +70,7 @@ eval "$(docker-machine env emacs-meetup)"
 docker build -t emacs:latest .
 #+END_SRC
 
-  Running the Emacs Container
+* Running the Emacs Container
 
 - ~socat~, a multipurpose network relay utility you'll need for the remote X Display
 - [[file:emacs.sh][emacs.sh]], a shell script that takes the pain away from calling ~docker~ with correct arguments
